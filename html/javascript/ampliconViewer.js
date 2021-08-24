@@ -11,7 +11,11 @@ var margins = {
     'svg_L': 10,
     'svg_R': 10,
     'svg_T': 10,
-    'svg_B': 10
+    'svg_B': 10,
+    'legend_w': 200,
+    'legend_padW': 2,
+    'legend_padH': 2,
+    'legend_rowH': 20,
 }
 
 function init_controller(){
@@ -95,7 +99,7 @@ function resize(){
     var subset_svg = display_div.select('svg.sv_display');
     var subset_g = subset_svg.selectAll('g.subset');
     // Now the SVG    
-    var svg_width = (div_w - margins.svg_L - margins.svg_R);
+    var svg_width = (div_w - margins.svg_L - margins.svg_R - margins.legend_w );
     subset_svg
         .attr('width', svg_width)
         .attr('height', subset_g.size() * (margins.subset_min_h + margins.subset_row_pad)+ margins.svg_T + margins.svg_B)
@@ -132,11 +136,11 @@ function resize(){
     if (status.order_type == 'numerical'){
         var X_scale = d3.scaleLinear()
             .domain([svg_hints.X_hints.min_X, svg_hints.X_hints.max_X])
-            .range([margins.subset_L, svg_width - margins.subset_L - margins.subset_R]);
+            .range([margins.subset_L, svg_width - margins.subset_L - margins.subset_R - 2*margins.legend_padW - margins.legend_w]);
     } else {
         var X_scale = d3.scaleBand()
             .domain(Array.from(svg_hints.X_hints.possible_X))
-            .range([margins.subset_L, svg_width - margins.subset_L - margins.subset_R]);
+            .range([margins.subset_L, svg_width - margins.subset_L - margins.subset_R - 2*margins.legend_padW - margins.legend_w]);
         
     }
     svg_hints['X_scale'] = X_scale;
@@ -149,6 +153,11 @@ function resize(){
             return 'translate('+0+','+(i*(margins.subset_min_h+margins.subset_row_pad))+')';
         });
     
+    // And the legend
+    var legend_g = d3.select("g#legend");
+    legend_g
+        .attr('transform', 'translate('+(svg_width - margins.legend_w - 2*margins.legend_padW)+','+margins.svg_T+')')
+        .attr('width', margins.legend_w);
     
     return [div_w, div_h];
 }
@@ -487,7 +496,103 @@ function change_resolution(){
         );
         data.svs = ordered_sv;
     } // end else not seq
+    // Now make a reverse mapping of taxa to SV
+    var sv_tax = data.sv_tax_dict[status.want_rank];
+    if (sv_tax != undefined){
+        // first map taxa (at want_rank) to SV
+        data.taxa_sv = Object.keys(sv_tax).reduce(function(p,sv){
+            if (!(sv_tax[sv] in p)) {
+                p[sv_tax[sv]] = new Set([sv]);
+            } else {
+                p[sv_tax[sv]].add(sv);
+            }
+            return p;
+        }, {}); 
+
+        data.subset_data.forEach(function(subset){
+            subset.forEach(function(sample){
+                sample['taxa_fract'] = {};
+                Object.keys(data.taxa_sv).forEach(
+                    function(t){
+                        sample['taxa_fract'][t] = Object.keys(sample.sv_fract).reduce(function(p, sv){
+                            if (data.taxa_sv[t].has(sv)) {
+                                p += sample.sv_fract[sv];
+                            }
+                            return p;
+                        }, 0);
+                    })
+            })
+        });
+
+    }
+    // And sum up fract by sv
+
+    console.log(data);
     update();
+}
+
+function update_legend(){
+    var legend_g = d3.select('svg.sv_display g#legend');
+    var data = d3.select("div#display svg").datum();
+    console.log(data);
+    if (data.taxa_sv == undefined){
+        return;
+    }
+    var taxa_mean_fract = Object.keys(data.taxa_sv).map(function(taxon){
+        return {
+            'taxon': taxon,
+            'mean_ra': data.subset_data.reduce(function(p, subset){
+            p += subset.reduce(function(sp, sample){
+                sp += sample.taxa_fract[taxon];
+                return sp;
+            }, 0) / subset.length
+            return p;
+        }, 0) / data.subset_data.length
+        }
+    }).sort(function(a, b){  return b.mean_ra - a.mean_ra });
+    console.log(taxa_mean_fract);
+
+    var legend_rowg = legend_g.selectAll('g.legend_row')
+        .data(taxa_mean_fract);
+    legend_rowg.exit().remove();
+    legend_rowg.enter().append('g')
+        .attr('class', 'legend_row');
+    var legend_rowg = legend_g.selectAll('g.legend_row')
+    legend_rowg
+        .attr('transform', function(d, i){ 
+            return 'translate('+margins.legend_padW+','+(margins.legend_rowH*i + margins.legend_padH)+')';
+        });
+    var legend_colorrect = legend_rowg.selectAll('rect.legend_color')
+        .data(function(d){ 
+            d['color'] = data.sv_metadata[Array.from(data.taxa_sv[d.taxon].values())[0]]['color'];
+            return [d];
+         });
+    legend_colorrect.exit().remove();
+    legend_colorrect.enter().append('rect')
+         .attr('class', 'legend_color');
+    var legend_colorrect = legend_rowg.selectAll('rect.legend_color');
+    legend_colorrect
+         .attr('width', margins.legend_rowH - margins.legend_padW)
+         .attr('height', margins.legend_rowH - margins.legend_padH)
+         .style('fill', function(d){return d.color; });
+    
+    var legend_labels = legend_rowg.selectAll('text.legend_label')
+         .data(function(d){
+            d['tax_name'] = data.sv_metadata[Array.from(data.taxa_sv[d.taxon].values())[0]]['name'];
+            return [d];
+         })
+    legend_labels.exit().remove();
+    legend_labels.enter().append('text')
+         .attr('class', 'legend_label');
+    var legend_labels = legend_rowg.selectAll('text.legend_label');
+    legend_labels
+         .attr('x', margins.legend_rowH + margins.legend_padW)
+         .attr('y', margins.legend_rowH - 2*margins.legend_padH)
+         .style('font-size', margins.legend_rowH*.75+'px')
+         .text(function(d){ return d.tax_name; });
+
+    
+    
 }
 
 function get_controller_status(){
@@ -542,5 +647,6 @@ function sv_deactivate(sv) {
 function update(){
     resize();
     plot_subsets();
+    update_legend();
 
 }
