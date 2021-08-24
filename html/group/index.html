@@ -1,0 +1,167 @@
+<html>
+<head>
+    <link rel='stylesheet' type='text/css' href='../../css/global.css'>
+    <script src="../../javascript/jquery-3.3.1.min.js"></script>
+    <script src="../../javascript/jquery.csv.0.8.9.min.js"></script>
+    <script src="../../javascript/d3.v5.7.0.min.js"></script>
+    <script src='../../javascript/ampliconViewer.js'></script>
+    <script src='../../javascript/tooltip.js'></script>
+<script>
+$(function(){  // document ready
+    // Load the hints
+    d3.json('../../data/hints.json').then(function(hints){
+
+        // load in the group-metadata
+        d3.csv('specimen_metadata.csv').then(function(sp_md){
+            // Get the subsets
+            var subsets = Array.from(sp_md.reduce(function(p, c){
+                return p.add(c[hints.subset_by]);
+            }, new Set())).sort();
+            // And metadata for each subset
+            var subset_metadata = subsets.map(function(ss_id){
+                var subset_md =  Array.from(sp_md.reduce(function(p, c){
+                    if (c[hints.subset_by] == ss_id){
+                        p.add(c);
+                    }
+                    return p;
+                }, new Set()));
+                // and sort
+                if (hints.order_type == 'numerical') {
+                    subset_md.sort(function(el1, el2){ return  parseFloat(el1[hints.order_by]) - parseFloat(el2[hints.order_by]); });
+                } else {
+                    subset_md.sort(function(el1, el2){ if (el1[hints.order_by] < el2[hints.order_by]) { return -1} else { return 1}; });
+                }
+                
+                return subset_md;
+            });
+            // Now load the specimen_sv_count data
+            d3.csv('svl.csv').then(function(svl){
+                // Now subset the SVL
+                var subset_data = subset_metadata.map(function(sub_md){
+                    return sub_md.map(function(md){
+                        return {
+                            specimen_metadata: md,
+                            svl: svl.reduce(function(p, c){  if(c.specimen == md.specimen) p.push(c); return p;  }, []),
+                            sv_fract: svl.reduce(function(p, c){  if(c.specimen == md.specimen) p[c.sv] = parseFloat(c.fract); return p;  }, {})
+   
+                        }
+                    });
+                });
+
+                // Also get a list of all possible SV
+                var svs = Array.from(svl.reduce(function(p, c){ 
+                    return p.add(c.sv);
+                 }, new Set())).sort();
+
+                var display_div = d3.select('div#display');
+                // Append an SVG to the display div
+                var sv_svg = display_div.append('svg')
+                    .attr('class', 'sv_display')
+                    .datum({
+                        'hints': hints,
+                        'num_subset': subset_data.length,
+                        //'X_hints': X_hints,
+                        'svs': svs,
+                        'specimen_metadata': sp_md,
+                        'subset_data': subset_data,
+                    });
+                init_sv_colors();
+                init_controller();
+
+                // Each subset gets a GROUP within the SVG
+                var subset_g = sv_svg.selectAll('g.subset')
+                    .data(subset_data);
+                subset_g.exit().remove();
+                subset_g.enter().append('g')
+                    .attr('class', 'subset');
+                var subset_g = display_div.selectAll('g.subset');
+                subset_g
+                    .attr('id', function(d){  return  'sg__'+d[0].specimen_metadata[hints.subset_by]; });
+                
+
+                // Now load taxonomy
+                d3.csv('sv_taxonomy.csv').then(function(sv_tax){
+                    var controller_div = d3.select('div#controller');
+                    var svg_hints = d3.select('div#display svg.sv_display').datum();
+                    // add the taxonomy in long format...
+                    svg_hints['sv_taxonomy'] = sv_tax;
+
+                    // Obtain the ranks in rank-order
+                    var rank_dict = sv_tax.reduce(function(p, c){
+                        p[parseInt(c.rank_depth)] = c.rank;
+                        return p;
+                    }, {});
+                    rank_ordered = Object.keys(rank_dict).sort().map(function(rank_i){
+                        return rank_dict[rank_i];
+                    });
+                    svg_hints['want_ranks_in_order'] = rank_ordered;
+                    
+                    // Now convert the long format sv_tax to a set of nested dictionaries,
+                    // sv_tax_dict[want_rank][sv_id] = tax_id (string)
+                    sv_tax_dict = sv_tax.reduce(function(p, tr){
+                        p[tr.want_rank][tr.sv] = tr.ncbi_tax_id.toString();
+                        return p;
+                    },
+                        rank_ordered.reduce(function(p,c){ p[c] = {}; return p; }, {})
+                    );
+                    svg_hints['sv_tax_dict'] = sv_tax_dict;
+
+                    // Also store the taxa information as a dict taxa[tax_id] = taxon
+                    svg_hints.taxa = sv_tax.reduce(function(p, c){
+                        p[c.ncbi_tax_id.toString()] = {
+                            rank: c.rank,
+                            lineage: c.lineage,
+                            tax_name: c.tax_name,
+                        }
+                        return p;
+                    }, {});
+
+                    rank_ordered.push('sequence variant');
+                    // Add a rank selector
+                    controller_div.append('label')
+                        .attr('for', 'want_rank')
+                        .text(" Wanted rank: ");
+                    var rank_selector = controller_div.append('select')
+                        .attr('id', 'want_rank');
+                    var rank_options = rank_selector.selectAll('option')
+                        .data(rank_ordered);
+                    rank_options.exit().remove();
+                    rank_options.enter().append('option');
+                    var rank_options = rank_selector.selectAll('option');
+                    rank_options
+                        .attr('value', function(d){ return d;})
+                        .text(function(d){ return d;});
+                    rank_selector.property('value', 'sequence variant');
+                    rank_selector.on('change', change_resolution);
+                    rank_ordered.reverse();
+
+                    // Finally add a legend G
+                    d3.select('div#display svg.sv_display').append('g')
+                        .attr('id', 'legend');
+                    update();
+
+                    
+
+                }); // end load sv_tax
+                
+
+            }); // end then SVL
+
+        }); // end loading of metadata
+
+    }); // end loading of hints
+
+
+
+});  // end document ready
+</script>    
+</head>
+<body>
+    <h1>ROME: Repository of Microbiome Experiments.</h1>
+
+    <div id='controller'>
+    </div>
+    <div id='display'>
+    </div>
+</body>
+</html>
