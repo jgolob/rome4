@@ -308,23 +308,44 @@ function plot_subsets(){
             .domain([0, 1])
             .range([0, margins.subset_min_h]);
         // Finally the SV bands
-        var sv_band = specimen_g.selectAll('rect.sv')
-            .data(function(d){
-                var y0 = 0;
-                return svg_hints.svs.reduce(function(p, sv){
-                    if (d.sv_fract[sv] != undefined){
-                        p.push({
-                            'sv': sv,
-                            'base': Y_scale(y0),
-                            'height': Y_scale(d.sv_fract[sv]),
-                            'width': svg_hints.X_scale.bandwidth()
-                        });
-                        y0 += d.sv_fract[sv];
-                    }
-                    return p;
-                }, []);
+        if (svg_hints.ordered_taxon == undefined) {        
+            var sv_band = specimen_g.selectAll('rect.sv')
+                .data(function(d){
+                    var y0 = 0;
+                    return svg_hints.svs.reduce(function(p, sv){
+                        if (d.sv_fract[sv] != undefined){
+                            p.push({
+                                'sv': sv,
+                                'base': Y_scale(y0),
+                                'height': Y_scale(d.sv_fract[sv]),
+                                'width': svg_hints.X_scale.bandwidth()
+                            });
+                            y0 += d.sv_fract[sv];
+                        }
+                        return p;
+                    }, []);
 
-            });
+                });
+        } else {
+            var sv_band = specimen_g.selectAll('rect.sv')
+                .data(function(d){
+                    var y0 = 0;
+                    return svg_hints.ordered_taxon.reduce(function(p, t){
+                        if (d.taxa_fract[t] != undefined){
+                            p.push({
+                                'taxon': t,
+                                'sv': Array.from(svg_hints.taxa_sv[t])[0],
+                                'base': Y_scale(y0),
+                                'height': Y_scale(d.taxa_fract[t]),
+                                'width': svg_hints.X_scale.bandwidth()
+                            });
+                            y0 += d.taxa_fract[t];
+                        }
+                        return p;
+                    }, []);
+
+                });            
+        }
         sv_band.exit().remove();
         sv_band.enter().append('rect')
             .attr('class', 'sv');
@@ -364,6 +385,7 @@ function change_resolution(){
 
     if (target_resolution  == 'sequence variant'){
         init_sv_colors();
+        data.ordered_taxon = undefined;
     } else {
 
         function recursive_group(sv_ids, end_target_rank_i, cur_target_rank_i) {
@@ -580,15 +602,12 @@ function change_resolution(){
 
     }
     // And sum up fract by sv
-
-    console.log(data);
     update();
 }
 
 function update_legend(){
     var legend_g = d3.select('svg.sv_display g#legend');
     var data = d3.select("div#display svg").datum();
-    console.log(data);
     if (data.taxa_sv == undefined){
         return;
     }
@@ -604,7 +623,6 @@ function update_legend(){
         }, 0) / data.subset_data.length
         }
     }).sort(function(a, b){  return b.mean_ra - a.mean_ra });
-    console.log(taxa_mean_fract);
 
     var legend_rowg = legend_g.selectAll('g.legend_row')
         .data(taxa_mean_fract);
