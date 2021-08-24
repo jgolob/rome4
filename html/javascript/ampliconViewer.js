@@ -204,38 +204,75 @@ function plot_subsets(){
 
         // remove any rects
         specimen_g.selectAll('rect').remove();
-        var sv_poly = specimen_g.selectAll('polygon.sv')
-            .data(function(d){
-                var y0 = 0;
-                var y1 = 0;
+        // Bind new data
+        if (svg_hints.ordered_taxon == undefined) {
+            var sv_poly = specimen_g.selectAll('polygon.sv')
+                .data(function(d){
+                    var y0 = 0;
+                    var y1 = 0;
 
-                return svg_hints.svs.reduce(function(p, sv){
-                    if (d.left_d.sv_fract[sv] != undefined){
-                        var dy0 = d.left_d.sv_fract[sv]
-                    } else {
-                        var dy0 = 0;
-                    }
-                    if (d.right_d.sv_fract[sv] != undefined){
-                        var dy1 = d.right_d.sv_fract[sv]
-                    } else {
-                        var dy1 = 0;
-                    }
-                    if ((dy0 != 0) || (dy1 != 0)) {
-                        p.push({
-                            'sv': sv,
-                            'y0': y0,
-                            'dy0': dy0,
-                            'y1': y1,
-                            'dy1': dy1,
-                            'width': d.width
-                        })
-                    }
-                    y0 += dy0;
-                    y1 += dy1;
-                    return p;
-                },[])
-                return [];
-            });
+                    return svg_hints.svs.reduce(function(p, sv){
+                        if (d.left_d.sv_fract[sv] != undefined){
+                            var dy0 = d.left_d.sv_fract[sv]
+                        } else {
+                            var dy0 = 0;
+                        }
+                        if (d.right_d.sv_fract[sv] != undefined){
+                            var dy1 = d.right_d.sv_fract[sv]
+                        } else {
+                            var dy1 = 0;
+                        }
+                        if ((dy0 != 0) || (dy1 != 0)) {
+                            p.push({
+                                'sv': sv,
+                                'y0': y0,
+                                'dy0': dy0,
+                                'y1': y1,
+                                'dy1': dy1,
+                                'width': d.width
+                            })
+                        }
+                        y0 += dy0;
+                        y1 += dy1;
+                        return p;
+                    },[])
+                    return [];
+                });
+            } else {
+                var sv_poly = specimen_g.selectAll('polygon.sv')
+                .data(function(d){
+                    var y0 = 0;
+                    var y1 = 0;
+
+                    return svg_hints.ordered_taxon.reduce(function(p, t){
+                        if (d.left_d.taxa_fract[t] != undefined){
+                            var dy0 = d.left_d.taxa_fract[t] 
+                        } else {
+                            var dy0 = 0;
+                        }
+                        if (d.right_d.taxa_fract[t]  != undefined){
+                            var dy1 = d.right_d.taxa_fract[t] 
+                        } else {
+                            var dy1 = 0;
+                        }
+                        if ((dy0 != 0) || (dy1 != 0)) {
+                            p.push({
+                                'sv': Array.from(svg_hints.taxa_sv[t])[0],
+                                'taxon': t,
+                                'y0': y0,
+                                'dy0': dy0,
+                                'y1': y1,
+                                'dy1': dy1,
+                                'width': d.width
+                            })
+                        }
+                        y0 += dy0;
+                        y1 += dy1;
+                        return p;
+                    },[])
+                    return [];
+                });                
+            }
         sv_poly.exit().remove();
         sv_poly.enter().append('polygon')
             .attr('class', 'sv');
@@ -424,6 +461,14 @@ function change_resolution(){
                         data.sv_metadata[sv_id]['name'] = group_tax_name;
                         data.sv_metadata[sv_id]['rank'] = group_tax_rank;
                     });
+                    if (!(tax_id in data.taxa)) {
+                        data.taxa[tax_id] = {
+                            'tax_name': group_tax_name,
+                            'tax_id': tax_id,
+                            'rank': group_tax_rank,
+                        }
+                    }
+                    data.taxa[tax_id]['color'] = group_color;
                     
                     return ordered_sv.concat(groups[tax_id]);
                 }, []);
@@ -496,6 +541,7 @@ function change_resolution(){
         );
         data.svs = ordered_sv;
     } // end else not seq
+
     // Now make a reverse mapping of taxa to SV
     var sv_tax = data.sv_tax_dict[status.want_rank];
     if (sv_tax != undefined){
@@ -508,6 +554,14 @@ function change_resolution(){
             }
             return p;
         }, {}); 
+
+        // ordered taxons from ordered_sv
+        data.ordered_taxon =ordered_sv.reduce(function(p, sv){
+            if (p.indexOf(sv_tax[sv]) == -1){
+                p.push(sv_tax[sv]);
+            } 
+            return p;
+        }, []);
 
         data.subset_data.forEach(function(subset){
             subset.forEach(function(sample){
