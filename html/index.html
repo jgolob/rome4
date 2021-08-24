@@ -1,0 +1,70 @@
+<html>
+<head>
+    <link rel='stylesheet' type='text/css' href='css/global.css'>
+    <script src="javascript/jquery-3.3.1.min.js"></script>
+    <script src="javascript/jquery.csv.0.8.9.min.js"></script>
+    <script src="javascript/d3.v5.7.0.min.js"></script>
+<script>
+$(function(){  // document ready
+    // Load the hints
+    d3.json('data/hints.json').then(function(hints){
+        // Now load in the specimen_metadata, find out the available groups and make a select / table for them
+        d3.csv('data/specimen_metadata.csv').then(function(sp_md_long){
+            sp_metadata_dict = sp_md_long.reduce(function(p, c){
+                p[c.specimen] = c;
+                return p;
+            }, {});
+            
+            // Use the `group_by` to get all the possible groups
+            var group_set = sp_md_long.reduce(function(p, c){
+                return p.add(c[hints.display_by]);
+            }, new Set());
+            var groups = Array.from(group_set).sort();
+            // bind the hints and specimen metadata to the controller DIV
+            d3.select("div#controller").datum({
+                hints: hints,
+                specimen_metadata_long: sp_md_long,
+                specimen_metadata_dict: sp_metadata_dict,
+                groups: groups
+            });
+
+            // Finally create links to each of the groups.
+            var group_ul = d3.select("div#display ul#display_groups");
+            var group_li =  group_ul.selectAll('li')
+                .data(groups);
+            group_li.exit().remove();
+            group_li.enter()
+                .append('li')
+                    .append('a');
+            var group_li =  group_ul.selectAll('li');
+            group_li.selectAll('a')
+                .attr('class', 'button')
+                .attr('href', function(d){ return 'group/'+String(d)+'/'})
+                .text(function(d){ return d;})
+
+
+        }); // end loading and handling of metadata
+        
+
+  
+
+    }); // end loading of hints
+
+
+
+});  // end document ready
+</script>    
+</head>
+<body>
+    <h1>ROME: Repository of Microbiome Experiments.</h1>
+
+    <div id='controller'>
+
+    </div>
+    <div id='display'>
+        <ul id='display_groups' class='vhoverlist'>
+
+        </ul>
+    </div>
+</body>
+</html>

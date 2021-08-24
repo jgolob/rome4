@@ -1,0 +1,19 @@
+div#contextMenu_div ul.menu {
+    list-style-type: none;
+    margin: 0;
+    padding:0;
+}
+
+div#contextMenu_div ul.menu li:hover {
+    background-color: #eee;
+}
+
+div#contextMenu_div ul.menu li a {
+    display: block;
+}
+
+div#contextMenu_div ul.menu li {
+    cursor: pointer;
+    margin:0 0 2px 0; 
+    background-color: #ddd;
+}
