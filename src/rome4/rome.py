@@ -18,7 +18,7 @@ class ROME4():
         sv_long,
         sv_tax=None,
         metadata=None,
-        template_dir='../../html/'
+        template_dir='../html/'
     ):
         self.__load_svl__(sv_long)
         self.__template_dir=template_dir
