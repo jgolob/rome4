@@ -1,4 +1,4 @@
 include src/rome4/html/*
 include src/rome4/html/javascript/*
 include src/rome4/html/css/*
-include src/rome4/group/*
+include src/rome4/html/group/*
