@@ -111,7 +111,10 @@ class ROME4():
         
         return out_dict
     
-    def output(self, base_dir, display_by=None, subset_by=None, order_by=None, order_type='categorical'):
+    def output(self, base_dir, display_by='all', subset_by='all', order_by='specimen', order_type='categorical'):
+        metadata_norm = self.__metadata__.copy()
+        if display_by == 'all' or subset_by == 'all':
+            metadata_norm['all'] = 'all'
         try:
             os.makedirs(
                 os.path.join(
@@ -162,7 +165,7 @@ class ROME4():
             os.path.join(base_dir, 'data', 'svl.csv'),
             index=None
         )
-        self.__metadata__.to_csv(
+        metadata_norm.to_csv(
             os.path.join(base_dir, 'data', 'specimen_metadata.csv'),
             index=None
         )
@@ -173,7 +176,7 @@ class ROME4():
 
         # Now onto the groups
         group_path = {}
-        for group, g_md in self.__metadata__.groupby(display_by):
+        for group, g_md in metadata_norm.groupby(display_by):
             group_basedir = os.path.join(base_dir, 'group', sanitize_filename(str(group)))
             group_path[group] = os.path.join('group', sanitize_filename(str(group)), "")
             try:
