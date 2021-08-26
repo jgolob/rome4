@@ -1,11 +1,10 @@
-function save_svg(svgID, cssLink){
+function save_svg(svg, cssLink){
         /*      Goal: Spit out the SVG for a figure such that it can be saved, opened in illustrator et al. 
          *      Input:
-         *              svgID: an ID of an SVG to be saved
+         *              svg: a D3 svg object.
          *              cssLink: a link to a CSS file to style (optional)
          *      Output: A new browser window with the SVG to be saved
          */
-        var svg = d3.select('svg#'+svgID);
        
         var svg_html = svg.html();
         
@@ -65,17 +64,16 @@ function save_svg(svgID, cssLink){
 
 function contextMenu_activate(svg, cssLink) {
         var contextMenu_div = d3.select('div#contextMenu_div');
-        
-        
+
         contextMenu_div
                 .style('top',(d3.event.pageY)+'px')
                 .style('left',(d3.event.pageX)+'px')
                 .style('visibility','visible');
         
         contextMenu_div.select('a#download')
-                .on('click',function(d){
+                .on('click',function(){
                         d3.event.preventDefault();
-                        save_svg(svg.attr('id'),cssLink);
+                        save_svg(svg, cssLink);
                         contextMenu_div.style('visibility','hidden');
                     });
 }
@@ -96,10 +94,12 @@ function contextMenu_build(){
                 
         ul.append('li').append('a')
                 .attr('id','download')
+                .attr('class', 'menu')
                 .text('Download Figure (as SVG)');
                 
         ul.append('li').append('a')
                 .attr('id','close')
+                .attr('class', 'menu')
                 .text('Close Menu')
                 .on('click',function(){
                         contextMenu_div.style('visibility','hidden');        

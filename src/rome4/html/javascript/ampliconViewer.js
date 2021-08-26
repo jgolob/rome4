@@ -77,10 +77,15 @@ function init_controller(){
         })
     
     d3.select(window).on('resize', function(){ 
-        console.log("win resize");
         update();
     });
     tooltip_build();
+    contextMenu_build();
+    d3.selectAll('svg.sv_display')
+        .on('contextmenu', function(){
+            d3.event.preventDefault();
+            contextMenu_activate(d3.select(this));
+        });
 }
  
 function resize(){
@@ -150,7 +155,7 @@ function resize(){
     subset_g
         .attr('height', margins.subset_min_h)
         .attr('transform', function(d, i){
-            return 'translate('+0+','+(i*(margins.subset_min_h+margins.subset_row_pad))+')';
+            return 'translate('+0+','+(margins.subset_row_pad+i*(margins.subset_min_h+margins.subset_row_pad))+')';
         });
     
     // And the legend
